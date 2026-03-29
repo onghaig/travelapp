@@ -91,12 +91,20 @@ export default function Dashboard() {
   };
 
   const computeBudget = (): BudgetBreakdown | null => {
-    if (tripState.budget) return tripState.budget;
-    if (!trip?.budget_total) return null;
+    // Determine the budget cap — prefer what the backend confirmed, else trip record
+    const budgetCap =
+      tripState.budget?.budget_total ??
+      trip?.budget_total ??
+      tripState.budget_total ??
+      null;
 
+    if (!budgetCap) return null;
+
+    // Always recompute from live selections so the tracker responds immediately
     const items: { label: string; cost: number; category: string }[] = [];
+
     if (selectedFlight) {
-      items.push({ label: selectedFlight.airline + ' flight', cost: selectedFlight.total_price, category: 'flights' });
+      items.push({ label: selectedFlight.airline + ' ' + selectedFlight.flight_number, cost: selectedFlight.total_price, category: 'flights' });
     }
     if (selectedLodging) {
       items.push({ label: selectedLodging.name, cost: selectedLodging.total_price, category: 'lodging' });
@@ -114,15 +122,16 @@ export default function Dashboard() {
     });
 
     return {
-      budget_total: trip.budget_total || 0,
+      budget_total: budgetCap,
       total_estimated: total,
-      remaining: (trip.budget_total || 0) - total,
-      over_budget: total > (trip.budget_total || 0),
-      percentage_used: trip.budget_total ? (total / trip.budget_total) * 100 : 0,
+      remaining: budgetCap - total,
+      over_budget: total > budgetCap,
+      percentage_used: budgetCap > 0 ? (total / budgetCap) * 100 : 0,
       breakdown,
-      warnings: total > (trip.budget_total || 0) ? [`Over budget by $${(total - (trip.budget_total || 0)).toFixed(0)}`] : [],
+      warnings: total > budgetCap ? [`Over budget by $${(total - budgetCap).toFixed(0)}`] : [],
     };
   };
+
 
   const budget = computeBudget();
 
