@@ -21,6 +21,7 @@ interface ChoiceOption {
   sendAs: string;
   description?: string;
   emoji?: string;
+  stateHint?: Partial<TripState>;
 }
 
 interface ChoicePrompt {
@@ -43,13 +44,36 @@ function addDays(base: Date, n: number): string {
   return d.toISOString().split('T')[0];
 }
 
+// Given the current message the user is sending and what's already in tripState,
+// infer what field they are most likely answering so we can update the UI immediately.
+function inferHintFromContext(message: string, state: TripState): Partial<TripState> {
+  if (!state.destination) {
+    // Anything typed at the destination step is treated as the destination
+    return { destination: message.trim() };
+  }
+  if (!state.departure_date) return {}; // backend parses natural language dates
+  if (!state.return_date) return {};    // backend parses natural language dates
+  if (!state.num_travelers) {
+    const m = message.match(/(\d+)/);
+    if (m) return { num_travelers: parseInt(m[1]) };
+    if (/solo|just me|alone|myself|1 person/i.test(message)) return { num_travelers: 1 };
+    return {};
+  }
+  if (!state.budget_total) {
+    const m = message.replace(/,/g, '').match(/\$?\s*([\d]+(?:\.\d+)?)/);
+    if (m) return { budget_total: parseFloat(m[1]) };
+    return {};
+  }
+  return {};
+}
+
 function getChoicePrompt(
   messages: ChatMessage[],
   tripState: TripState,
   isStreaming: boolean
 ): ChoicePrompt | null {
   if (isStreaming) return null;
-  const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant' && m.content && !m.isStreaming);
+  const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant' && !m.isStreaming);
   if (!lastAssistant) return null;
 
   const { destination, departure_date, return_date, num_travelers, budget_total, flights, lodging } = tripState;
@@ -58,14 +82,14 @@ function getChoicePrompt(
     return {
       title: 'Choose a destination',
       options: [
-        { label: 'Tokyo', sendAs: 'Tokyo', emoji: '🇯🇵', description: 'Japan — culture & food' },
-        { label: 'Paris', sendAs: 'Paris', emoji: '🇫🇷', description: 'France — art & romance' },
-        { label: 'Bali', sendAs: 'Bali', emoji: '🇮🇩', description: 'Indonesia — beaches & temples' },
-        { label: 'New York', sendAs: 'New York', emoji: '🗽', description: 'USA — the city that never sleeps' },
-        { label: 'Rome', sendAs: 'Rome', emoji: '🇮🇹', description: 'Italy — history & food' },
-        { label: 'Bangkok', sendAs: 'Bangkok', emoji: '🇹🇭', description: 'Thailand — street food & temples' },
-        { label: 'Barcelona', sendAs: 'Barcelona', emoji: '🇪🇸', description: 'Spain — architecture & beaches' },
-        { label: 'London', sendAs: 'London', emoji: '🇬🇧', description: 'UK — culture & history' },
+        { label: 'Tokyo', sendAs: 'Tokyo', emoji: '🇯🇵', description: 'Japan — culture & food', stateHint: { destination: 'Tokyo' } },
+        { label: 'Paris', sendAs: 'Paris', emoji: '🇫🇷', description: 'France — art & romance', stateHint: { destination: 'Paris' } },
+        { label: 'Bali', sendAs: 'Bali', emoji: '🇮🇩', description: 'Indonesia — beaches & temples', stateHint: { destination: 'Bali' } },
+        { label: 'New York', sendAs: 'New York', emoji: '🗽', description: 'USA — the city that never sleeps', stateHint: { destination: 'New York' } },
+        { label: 'Rome', sendAs: 'Rome', emoji: '🇮🇹', description: 'Italy — history & food', stateHint: { destination: 'Rome' } },
+        { label: 'Bangkok', sendAs: 'Bangkok', emoji: '🇹🇭', description: 'Thailand — street food & temples', stateHint: { destination: 'Bangkok' } },
+        { label: 'Barcelona', sendAs: 'Barcelona', emoji: '🇪🇸', description: 'Spain — architecture & beaches', stateHint: { destination: 'Barcelona' } },
+        { label: 'London', sendAs: 'London', emoji: '🇬🇧', description: 'UK — culture & history', stateHint: { destination: 'London' } },
       ],
     };
   }
@@ -75,10 +99,10 @@ function getChoicePrompt(
     return {
       title: 'When do you want to leave?',
       options: [
-        { label: 'In 2 weeks', sendAs: `I want to leave ${fmtDate(addDays(today, 14))}`, emoji: '📅', description: fmtDate(addDays(today, 14)) },
-        { label: 'Next month', sendAs: `I want to leave ${fmtDate(addDays(today, 30))}`, emoji: '📅', description: fmtDate(addDays(today, 30)) },
-        { label: 'In 2 months', sendAs: `I want to leave ${fmtDate(addDays(today, 60))}`, emoji: '📅', description: fmtDate(addDays(today, 60)) },
-        { label: 'In 3 months', sendAs: `I want to leave ${fmtDate(addDays(today, 90))}`, emoji: '📅', description: fmtDate(addDays(today, 90)) },
+        { label: 'In 2 weeks', sendAs: `I want to leave ${fmtDate(addDays(today, 14))}`, emoji: '📅', description: fmtDate(addDays(today, 14)), stateHint: { departure_date: addDays(today, 14) } },
+        { label: 'Next month', sendAs: `I want to leave ${fmtDate(addDays(today, 30))}`, emoji: '📅', description: fmtDate(addDays(today, 30)), stateHint: { departure_date: addDays(today, 30) } },
+        { label: 'In 2 months', sendAs: `I want to leave ${fmtDate(addDays(today, 60))}`, emoji: '📅', description: fmtDate(addDays(today, 60)), stateHint: { departure_date: addDays(today, 60) } },
+        { label: 'In 3 months', sendAs: `I want to leave ${fmtDate(addDays(today, 90))}`, emoji: '📅', description: fmtDate(addDays(today, 90)), stateHint: { departure_date: addDays(today, 90) } },
       ],
     };
   }
@@ -88,10 +112,10 @@ function getChoicePrompt(
     return {
       title: 'How long is the trip?',
       options: [
-        { label: 'Long weekend', sendAs: `I'll return ${fmtDate(addDays(dep, 3))}`, emoji: '🗓️', description: '3 nights' },
-        { label: '1 week', sendAs: `I'll return ${fmtDate(addDays(dep, 7))}`, emoji: '🗓️', description: '7 nights' },
-        { label: '10 days', sendAs: `I'll return ${fmtDate(addDays(dep, 10))}`, emoji: '🗓️', description: '10 nights' },
-        { label: '2 weeks', sendAs: `I'll return ${fmtDate(addDays(dep, 14))}`, emoji: '🗓️', description: '14 nights' },
+        { label: 'Long weekend', sendAs: `I'll return ${fmtDate(addDays(dep, 3))}`, emoji: '🗓️', description: '3 nights', stateHint: { return_date: addDays(dep, 3) } },
+        { label: '1 week', sendAs: `I'll return ${fmtDate(addDays(dep, 7))}`, emoji: '🗓️', description: '7 nights', stateHint: { return_date: addDays(dep, 7) } },
+        { label: '10 days', sendAs: `I'll return ${fmtDate(addDays(dep, 10))}`, emoji: '🗓️', description: '10 nights', stateHint: { return_date: addDays(dep, 10) } },
+        { label: '2 weeks', sendAs: `I'll return ${fmtDate(addDays(dep, 14))}`, emoji: '🗓️', description: '14 nights', stateHint: { return_date: addDays(dep, 14) } },
       ],
     };
   }
@@ -100,10 +124,10 @@ function getChoicePrompt(
     return {
       title: 'How many travelers?',
       options: [
-        { label: 'Just me', sendAs: 'Just me — 1 traveler', emoji: '🧑', description: 'Solo travel' },
-        { label: '2 people', sendAs: '2 travelers', emoji: '👫', description: 'Couple or friends' },
-        { label: '3–4 people', sendAs: '4 travelers', emoji: '👨‍👩‍👧', description: 'Small group or family' },
-        { label: '5+ people', sendAs: '6 travelers', emoji: '👥', description: 'Large group' },
+        { label: 'Just me', sendAs: 'Just me — 1 traveler', emoji: '🧑', description: 'Solo travel', stateHint: { num_travelers: 1 } },
+        { label: '2 people', sendAs: '2 travelers', emoji: '👫', description: 'Couple or friends', stateHint: { num_travelers: 2 } },
+        { label: '3–4 people', sendAs: '4 travelers', emoji: '👨‍👩‍👧', description: 'Small group or family', stateHint: { num_travelers: 4 } },
+        { label: '5+ people', sendAs: '6 travelers', emoji: '👥', description: 'Large group', stateHint: { num_travelers: 6 } },
       ],
     };
   }
@@ -112,10 +136,10 @@ function getChoicePrompt(
     return {
       title: 'What\'s your total budget?',
       options: [
-        { label: 'Budget', sendAs: 'My total budget is $1,500', emoji: '💵', description: '~$1,500 USD' },
-        { label: 'Mid-range', sendAs: 'My total budget is $3,500', emoji: '💳', description: '~$3,500 USD' },
-        { label: 'Premium', sendAs: 'My total budget is $7,000', emoji: '💎', description: '~$7,000 USD' },
-        { label: 'Luxury', sendAs: 'My total budget is $15,000', emoji: '✨', description: '~$15,000+ USD' },
+        { label: 'Budget', sendAs: 'My total budget is $1,500', emoji: '💵', description: '~$1,500 USD', stateHint: { budget_total: 1500 } },
+        { label: 'Mid-range', sendAs: 'My total budget is $3,500', emoji: '💳', description: '~$3,500 USD', stateHint: { budget_total: 3500 } },
+        { label: 'Premium', sendAs: 'My total budget is $7,000', emoji: '💎', description: '~$7,000 USD', stateHint: { budget_total: 7000 } },
+        { label: 'Luxury', sendAs: 'My total budget is $15,000', emoji: '✨', description: '~$15,000+ USD', stateHint: { budget_total: 15000 } },
       ],
     };
   }
@@ -191,7 +215,7 @@ export default function Chat({ onAuthChange, isAuthenticated }: Props) {
     return trip.id;
   };
 
-  const handleSend = async (overrideMessage?: string) => {
+  const handleSend = async (overrideMessage?: string, hint?: Partial<TripState>) => {
     const userContent = overrideMessage ?? input;
     if (!userContent.trim() || isStreaming) return;
 
@@ -199,6 +223,13 @@ export default function Chat({ onAuthChange, isAuthenticated }: Props) {
     if (userContent === '__dashboard__') {
       if (tripId) navigate(`/dashboard/${tripId}`);
       return;
+    }
+
+    // Apply optimistic hint BEFORE auth check so the panel always advances even
+    // if the user gets redirected to the auth modal.
+    const effectiveHint = hint ?? inferHintFromContext(userContent, tripState);
+    if (Object.keys(effectiveHint).length > 0) {
+      setTripState((prev) => ({ ...prev, ...effectiveHint }));
     }
 
     const token = localStorage.getItem('travvy_token');
@@ -241,7 +272,9 @@ export default function Chat({ onAuthChange, isAuthenticated }: Props) {
             setActiveTools((prev) => prev.filter((t) => t.tool !== chunk.tool));
           } else if (chunk.type === 'trip_state_update') {
             latestTripState = chunk.state;
-            setTripState(chunk.state);
+            // Merge instead of replace so optimistic hints survive if backend
+            // doesn't re-send every field on every update.
+            setTripState((prev) => ({ ...prev, ...chunk.state }));
           } else if (chunk.type === 'calendar_update') {
             setTripState((prev) => ({ ...prev, calendar_events: chunk.events }));
           } else if (chunk.type === 'budget_update') {
@@ -343,11 +376,10 @@ export default function Chat({ onAuthChange, isAuthenticated }: Props) {
         <div className="flex-1 overflow-y-auto px-4 pb-2 space-y-4">
           {messages.map((msg) => (
             <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in duration-300`}>
-              <div className={`max-w-[80%] px-4 py-3 rounded-2xl ${
-                msg.role === 'user'
-                  ? 'bg-amber text-navy font-medium rounded-br-sm'
-                  : 'bg-white/5 border border-white/10 text-slate-text rounded-bl-sm backdrop-blur-sm'
-              }`}>
+              <div className={`max-w-[80%] px-4 py-3 rounded-2xl ${msg.role === 'user'
+                ? 'bg-amber text-navy font-medium rounded-br-sm'
+                : 'bg-white/5 border border-white/10 text-slate-text rounded-bl-sm backdrop-blur-sm'
+                }`}>
                 {msg.isStreaming && !msg.content ? (
                   <div className="flex gap-1.5 py-1">
                     <span className="typing-dot w-2 h-2 rounded-full bg-slate-muted" />
@@ -385,7 +417,7 @@ export default function Chat({ onAuthChange, isAuthenticated }: Props) {
               {choicePrompt.options.map((opt) => (
                 <button
                   key={opt.sendAs}
-                  onClick={() => handleSend(opt.sendAs)}
+                  onClick={() => handleSend(opt.sendAs, opt.stateHint)}
                   className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5 hover:border-amber/40 hover:bg-amber/5 text-left transition-all group"
                 >
                   {opt.emoji && <span className="text-2xl flex-shrink-0">{opt.emoji}</span>}
