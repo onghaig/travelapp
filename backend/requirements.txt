@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+anthropic
+supabase
+redis
+playwright
+python-dotenv
+pydantic
+httpx
+asyncio
+ruff
