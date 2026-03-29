@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowRight, RefreshCw } from 'lucide-react';
-import { getTrip } from '../lib/api';
+import { getTrip, updateTrip } from '../lib/api';
 import { Trip, TripState, Flight, Lodging, TripEvent, CalendarEvent, BudgetBreakdown } from '../lib/types';
 import Calendar from '../components/Calendar';
 import BudgetTracker from '../components/BudgetTracker';
@@ -47,6 +47,30 @@ export default function Dashboard() {
 
   const handleStateUpdate = (state: TripState) => {
     setTripState(state);
+    if (state.selected_flight) setSelectedFlight(state.selected_flight);
+    if (state.selected_lodging) setSelectedLodging(state.selected_lodging);
+    if (state.selected_events) setSelectedEvents(new Set(state.selected_events.map((e) => e.id)));
+  };
+
+  const persistSelection = async (patch: Partial<TripState>) => {
+    if (!tripId) return;
+    const newState = { ...tripState, ...patch };
+    setTripState(newState);
+    try {
+      await updateTrip(tripId, { state_json: newState });
+    } catch {
+      // non-fatal
+    }
+  };
+
+  const handleFlightSelect = (flight: Flight) => {
+    setSelectedFlight(flight);
+    persistSelection({ selected_flight: flight });
+  };
+
+  const handleLodgingSelect = (lodging: Lodging) => {
+    setSelectedLodging(lodging);
+    persistSelection({ selected_lodging: lodging });
   };
 
   const toggleEvent = (event: TripEvent) => {
@@ -57,6 +81,8 @@ export default function Dashboard() {
       } else {
         next.add(event.id);
       }
+      const selected = (tripState.events || []).filter((e) => next.has(e.id));
+      persistSelection({ selected_events: selected });
       return next;
     });
   };
@@ -188,7 +214,7 @@ export default function Dashboard() {
                     key={flight.id}
                     flight={flight}
                     selected={selectedFlight?.id === flight.id}
-                    onSelect={setSelectedFlight}
+                    onSelect={handleFlightSelect}
                   />
                 ))
               )}
@@ -208,7 +234,7 @@ export default function Dashboard() {
                     key={l.id}
                     lodging={l}
                     selected={selectedLodging?.id === l.id}
-                    onSelect={setSelectedLodging}
+                    onSelect={handleLodgingSelect}
                   />
                 ))
               )}

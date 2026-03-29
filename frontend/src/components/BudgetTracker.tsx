@@ -26,7 +26,9 @@ export default function BudgetTracker({ budget }: BudgetTrackerProps) {
     <div className="bg-navy-card rounded-xl border border-slate-border p-4">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-slate-text">Budget Tracker</h3>
-        <span className={`text-sm font-medium ${budget.over_budget ? 'text-red-400' : 'text-green-400'}`}>
+        <span className={`text-sm font-medium ${
+          budget.over_budget ? 'text-red-400' : budget.percentage_used >= 80 ? 'text-amber' : 'text-green-400'
+        }`}>
           {budget.over_budget ? 'Over budget' : `${budget.percentage_used.toFixed(0)}% used`}
         </span>
       </div>
@@ -86,7 +88,7 @@ export default function BudgetTracker({ budget }: BudgetTrackerProps) {
       <div className="w-full h-2 bg-navy-light rounded-full overflow-hidden mb-3">
         <div
           className={`h-full rounded-full transition-all duration-500 ${
-            budget.over_budget ? 'bg-red-500' : 'bg-amber'
+            budget.over_budget ? 'bg-red-500' : budget.percentage_used >= 80 ? 'bg-amber' : 'bg-green-500'
           }`}
           style={{ width: `${Math.min(100, budget.percentage_used)}%` }}
         />
