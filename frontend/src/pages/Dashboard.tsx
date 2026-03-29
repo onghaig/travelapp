@@ -18,6 +18,7 @@ export default function Dashboard() {
   const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null);
   const [selectedLodging, setSelectedLodging] = useState<Lodging | null>(null);
   const [selectedEvents, setSelectedEvents] = useState<Set<string>>(new Set());
+  const [calendarFocusDate, setCalendarFocusDate] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'flights' | 'lodging' | 'events'>('flights');
 
@@ -66,25 +67,27 @@ export default function Dashboard() {
   const handleFlightSelect = (flight: Flight) => {
     setSelectedFlight(flight);
     persistSelection({ selected_flight: flight });
+    try { setCalendarFocusDate(new Date(flight.departure_time)); } catch { /* noop */ }
   };
 
   const handleLodgingSelect = (lodging: Lodging) => {
     setSelectedLodging(lodging);
     persistSelection({ selected_lodging: lodging });
+    try { setCalendarFocusDate(new Date(lodging.check_in + 'T12:00:00')); } catch { /* noop */ }
   };
 
   const toggleEvent = (event: TripEvent) => {
     setSelectedEvents((prev) => {
       const next = new Set(prev);
-      if (next.has(event.id)) {
-        next.delete(event.id);
-      } else {
-        next.add(event.id);
-      }
+      if (next.has(event.id)) { next.delete(event.id); } else { next.add(event.id); }
       const selected = (tripState.events || []).filter((e) => next.has(e.id));
       persistSelection({ selected_events: selected });
       return next;
     });
+    // Focus calendar on the departure date (events don't have a date, so use flight if available)
+    if (selectedFlight) {
+      try { setCalendarFocusDate(new Date(selectedFlight.departure_time)); } catch { /* noop */ }
+    }
   };
 
   const computeBudget = (): BudgetBreakdown | null => {
@@ -122,7 +125,98 @@ export default function Dashboard() {
   };
 
   const budget = computeBudget();
-  const calendarEvents: CalendarEvent[] = tripState.calendar_events || [];
+
+  // Build calendar events from selections when the backend hasn't synced them yet
+  const buildCalendarEventsFromSelections = (): CalendarEvent[] => {
+    const evts: CalendarEvent[] = [];
+
+    // ── Outbound flight ───────────────────────────────────────────────────
+    if (selectedFlight) {
+      evts.push({
+        id: `flight-out-${selectedFlight.id}`,
+        trip_id: tripId || '',
+        type: 'flight',
+        title: `✈ ${selectedFlight.airline} ${selectedFlight.flight_number}`,
+        start_time: selectedFlight.departure_time,
+        end_time: selectedFlight.arrival_time,
+        location: `${selectedFlight.origin} → ${selectedFlight.destination}`,
+        color: '#3b82f6',
+        metadata: {},
+      });
+
+      // ── Return flight (same airline on return_date) ───────────────────
+      const returnDate = tripState.return_date;
+      if (returnDate) {
+        // Use the return date but keep the departure hh:mm from the outbound flight
+        const depTime = new Date(selectedFlight.departure_time);
+        const retDep  = new Date(`${returnDate}T${depTime.toISOString().substring(11)}`);
+        const durationMs =
+          new Date(selectedFlight.arrival_time).getTime() -
+          new Date(selectedFlight.departure_time).getTime();
+        const retArr = new Date(retDep.getTime() + durationMs);
+
+        evts.push({
+          id: `flight-ret-${selectedFlight.id}`,
+          trip_id: tripId || '',
+          type: 'flight',
+          title: `✈ ${selectedFlight.airline} (return)`,
+          start_time: retDep.toISOString(),
+          end_time: retArr.toISOString(),
+          location: `${selectedFlight.destination} → ${selectedFlight.origin}`,
+          color: '#3b82f6',
+          metadata: {},
+        });
+      }
+    }
+
+    // ── Lodging — spans full check_in (3 PM) → check_out (11 AM) ─────────
+    if (selectedLodging) {
+      evts.push({
+        id: `lodging-${selectedLodging.id}`,
+        trip_id: tripId || '',
+        type: 'lodging',
+        title: `🏨 ${selectedLodging.name}`,
+        start_time: `${selectedLodging.check_in}T15:00:00`,
+        end_time:   `${selectedLodging.check_out}T11:00:00`,
+        location: selectedLodging.neighborhood,
+        color: '#22c55e',
+        metadata: {},
+      });
+    }
+
+    // ── Activities — spread one per day starting the day after check-in ──
+    const base = selectedLodging
+      ? new Date(`${selectedLodging.check_in}T10:00:00`)
+      : selectedFlight
+      ? new Date(selectedFlight.arrival_time)
+      : new Date();
+
+    (tripState.events || [])
+      .filter((e) => selectedEvents.has(e.id))
+      .forEach((e, i) => {
+        const eventStart = new Date(base.getTime() + (i + 1) * 86_400_000);
+        const eventEnd   = new Date(eventStart.getTime() + e.duration_hours * 3_600_000);
+        evts.push({
+          id: `event-${e.id}`,
+          trip_id: tripId || '',
+          type: 'event',
+          title: e.name,
+          start_time: eventStart.toISOString(),
+          end_time:   eventEnd.toISOString(),
+          location: e.destination,
+          color: '#a855f7',
+          metadata: {},
+        });
+      });
+
+    return evts;
+  };
+
+
+  const calendarEvents: CalendarEvent[] =
+    (tripState.calendar_events || []).length > 0
+      ? tripState.calendar_events!
+      : buildCalendarEventsFromSelections();
 
   if (isLoading) {
     return (
@@ -175,7 +269,7 @@ export default function Dashboard() {
             </button>
           </div>
           <div className="relative">
-            <Calendar events={calendarEvents} />
+            <Calendar events={calendarEvents} focusDate={calendarFocusDate} />
           </div>
         </div>
 
