@@ -3,7 +3,7 @@ import json
 import os
 from typing import AsyncGenerator
 
-import anthropic
+import openai
 
 from backend.agents.flight_agent import FlightAgent
 from backend.agents.lodging_agent import LodgingAgent
@@ -50,8 +50,8 @@ class OrchestratorAgent:
     """
 
     def __init__(self, trip_state: dict, user: dict):
-        self.client = anthropic.AsyncAnthropic(
-            api_key=os.getenv("ANTHROPIC_API_KEY", "")
+        self.client = openai.AsyncOpenAI(
+            api_key=os.getenv("OPENAI_API_KEY", "")
         )
         self.trip_state = trip_state
         self.user = user
@@ -92,80 +92,96 @@ class OrchestratorAgent:
     ) -> AsyncGenerator[dict, None]:
         messages = self.build_messages(user_message, history)
 
-        # Agentic loop — keeps running until Claude stops calling tools
         while True:
-            response = await self.client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=8000,
-                system=self.SYSTEM_PROMPT.format(
-                    trip_state=json.dumps(self.trip_state)
-                ),
+            # Prepare messages with system prompt first
+            openai_messages = [
+                {"role": "system", "content": self.SYSTEM_PROMPT.format(trip_state=json.dumps(self.trip_state))}
+            ] + messages
+
+            response = await self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=openai_messages,
                 tools=TOOLS,
-                messages=messages,
             )
+            
+            choice = response.choices[0]
+            message = choice.message
 
             # Stream text deltas
-            for block in response.content:
-                if hasattr(block, "type") and block.type == "text":
-                    yield {"type": "text_delta", "content": block.text}
+            if message.content:
+                yield {"type": "text_delta", "content": message.content}
 
             # If no tool calls, we're done
-            if response.stop_reason != "tool_use":
+            if choice.finish_reason != "tool_calls":
+                # Append final reply to history
+                messages.append({"role": "assistant", "content": message.content or ""})
                 yield {"type": "done"}
                 break
 
-            # Handle tool calls — run independent ones in parallel
-            tool_calls = [
-                b for b in response.content if hasattr(b, "type") and b.type == "tool_use"
-            ]
+            # Handle tool calls
+            tool_calls = message.tool_calls or []
             parallel_tools = ["search_flights", "search_lodging", "find_events"]
 
-            parallel = [t for t in tool_calls if t.name in parallel_tools]
-            sequential = [t for t in tool_calls if t.name not in parallel_tools]
+            parallel = [t for t in tool_calls if t.function.name in parallel_tools]
+            sequential = [t for t in tool_calls if t.function.name not in parallel_tools]
 
             # Emit tool_start events
             for tool_call in tool_calls:
                 yield {
                     "type": "tool_start",
-                    "tool": tool_call.name,
-                    "status": self.get_status_message(tool_call.name),
+                    "tool": tool_call.function.name,
+                    "status": self.get_status_message(tool_call.function.name),
                 }
 
             # Append assistant message with tool use
-            messages.append({"role": "assistant", "content": response.content})
+            assistant_msg = {"role": "assistant", "content": message.content}
+            assistant_msg["tool_calls"] = [
+                {
+                    "id": t.id,
+                    "type": "function",
+                    "function": {
+                        "name": t.function.name,
+                        "arguments": t.function.arguments,
+                    }
+                }
+                for t in tool_calls
+            ]
+            messages.append(assistant_msg)
 
             tool_results = []
 
-            # Execute parallel tools simultaneously
+            # Execute parallel tools
             if parallel:
                 results = await asyncio.gather(
-                    *[self.sub_agents[t.name].run(t.input) for t in parallel]
+                    *[self.sub_agents[t.function.name].run(json.loads(t.function.arguments)) for t in parallel]
                 )
                 for tool_call, result in zip(parallel, results):
-                    yield {"type": "tool_result", "tool": tool_call.name, "data": result}
-                    self.update_trip_state(tool_call.name, result)
+                    yield {"type": "tool_result", "tool": tool_call.function.name, "data": result}
+                    self.update_trip_state(tool_call.function.name, result)
                     tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": tool_call.id,
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "name": tool_call.function.name,
                         "content": json.dumps(result),
                     })
 
-            # Execute sequential tools one by one
+            # Execute sequential tools
             for tool_call in sequential:
-                result = await self.sub_agents[tool_call.name].run(tool_call.input)
-                yield {"type": "tool_result", "tool": tool_call.name, "data": result}
-                self.update_trip_state(tool_call.name, result)
+                result = await self.sub_agents[tool_call.function.name].run(json.loads(tool_call.function.arguments))
+                yield {"type": "tool_result", "tool": tool_call.function.name, "data": result}
+                self.update_trip_state(tool_call.function.name, result)
                 tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": tool_call.id,
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "name": tool_call.function.name,
                     "content": json.dumps(result),
                 })
 
-            # Add all tool results in one user message
+            # Add all tool results back to history
             if tool_results:
-                messages.append({"role": "user", "content": tool_results})
+                messages.extend(tool_results)
 
-            # Emit state/calendar/budget updates after each round
+            # Emit state/calendar/budget updates
             yield {"type": "trip_state_update", "state": self.trip_state}
             if "calendar_events" in self.trip_state:
                 yield {

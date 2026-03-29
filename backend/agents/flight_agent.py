@@ -1,6 +1,5 @@
 import json
 import os
-import anthropic
 from backend.tools.mock_amadeus import search_flights
 
 
