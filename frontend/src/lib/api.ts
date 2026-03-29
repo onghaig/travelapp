@@ -38,6 +38,21 @@ export async function login(email: string, password: string): Promise<{ user: { 
   return data;
 }
 
+export async function signup(email: string, password: string): Promise<{ user?: { id: string; email: string }; access_token?: string; message?: string }> {
+  const res = await fetch(`${API_URL}/api/auth/signup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Signup failed');
+  }
+  const data = await res.json();
+  if (data.access_token) setToken(data.access_token);
+  return data;
+}
+
 export async function logout(): Promise<void> {
   await authFetch('/api/auth/logout', { method: 'POST' });
   clearToken();

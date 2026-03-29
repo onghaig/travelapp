@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Send, Loader2, MapPin, Calendar, Users, DollarSign } from 'lucide-react';
-import { login, streamChat, createTrip } from '../lib/api';
+import { login, signup, streamChat, createTrip } from '../lib/api';
 import { ChatChunk, TripState } from '../lib/types';
 
 interface ChatMessage {
@@ -35,9 +35,11 @@ export default function Chat({ onAuthChange }: Props) {
   const [tripState, setTripState] = useState<TripState>({});
   const [tripId, setTripId] = useState<string | null>(null);
   const [showAuth, setShowAuth] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState('');
+  const [authMessage, setAuthMessage] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -131,14 +133,25 @@ export default function Chat({ onAuthChange }: Props) {
     e.preventDefault();
     setIsAuthLoading(true);
     setAuthError('');
+    setAuthMessage('');
     try {
-      await login(authEmail, authPassword);
-      onAuthChange(true);
-      setShowAuth(false);
-      // Retry the pending message
-      handleSend();
-    } catch {
-      setAuthError('Invalid email or password');
+      if (authMode === 'login') {
+        await login(authEmail, authPassword);
+        onAuthChange(true);
+        setShowAuth(false);
+        handleSend();
+      } else {
+        const result = await signup(authEmail, authPassword);
+        if (result.access_token) {
+          onAuthChange(true);
+          setShowAuth(false);
+          handleSend();
+        } else {
+          setAuthMessage(result.message || 'Check your email to confirm your account.');
+        }
+      }
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : authMode === 'login' ? 'Invalid email or password' : 'Signup failed');
     } finally {
       setIsAuthLoading(false);
     }
@@ -275,44 +288,67 @@ export default function Chat({ onAuthChange }: Props) {
       {showAuth && (
         <div className="fixed inset-0 bg-navy/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-navy-card border border-slate-border rounded-2xl p-6 w-full max-w-sm">
-            <h2 className="font-serif text-2xl text-slate-text mb-1">Sign in</h2>
+            <h2 className="font-serif text-2xl text-slate-text mb-1">
+              {authMode === 'login' ? 'Sign in' : 'Create account'}
+            </h2>
             <p className="text-sm text-slate-muted mb-5">Save your trip and continue planning.</p>
             {authError && (
               <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-sm text-red-400">
                 {authError}
               </div>
             )}
-            <form onSubmit={handleAuth} className="space-y-3">
-              <input
-                type="email"
-                value={authEmail}
-                onChange={(e) => setAuthEmail(e.target.value)}
-                placeholder="Email"
-                required
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-text placeholder:text-slate-muted focus:outline-none focus:border-amber/50 transition-colors text-sm"
-              />
-              <input
-                type="password"
-                value={authPassword}
-                onChange={(e) => setAuthPassword(e.target.value)}
-                placeholder="Password"
-                required
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-text placeholder:text-slate-muted focus:outline-none focus:border-amber/50 transition-colors text-sm"
-              />
+            {authMessage && (
+              <div className="mb-4 p-3 rounded-lg bg-amber/10 border border-amber/30 text-sm text-amber">
+                {authMessage}
+              </div>
+            )}
+            {!authMessage && (
+              <form onSubmit={handleAuth} className="space-y-3">
+                <input
+                  type="email"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  placeholder="Email"
+                  required
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-text placeholder:text-slate-muted focus:outline-none focus:border-amber/50 transition-colors text-sm"
+                />
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  placeholder="Password"
+                  required
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-slate-text placeholder:text-slate-muted focus:outline-none focus:border-amber/50 transition-colors text-sm"
+                />
+                <button
+                  type="submit"
+                  disabled={isAuthLoading}
+                  className="w-full py-3 rounded-xl bg-amber text-navy font-medium hover:bg-amber-light disabled:opacity-50 transition-colors text-sm"
+                >
+                  {isAuthLoading
+                    ? authMode === 'login' ? 'Signing in...' : 'Creating account...'
+                    : authMode === 'login' ? 'Continue' : 'Create account'}
+                </button>
+              </form>
+            )}
+            <div className="mt-3 flex flex-col items-center gap-1">
               <button
-                type="submit"
-                disabled={isAuthLoading}
-                className="w-full py-3 rounded-xl bg-amber text-navy font-medium hover:bg-amber-light disabled:opacity-50 transition-colors text-sm"
+                onClick={() => {
+                  setAuthMode(authMode === 'login' ? 'signup' : 'login');
+                  setAuthError('');
+                  setAuthMessage('');
+                }}
+                className="text-xs text-slate-muted hover:text-slate-text transition-colors"
               >
-                {isAuthLoading ? 'Signing in...' : 'Continue'}
+                {authMode === 'login' ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
               </button>
-            </form>
-            <button
-              onClick={() => setShowAuth(false)}
-              className="mt-3 w-full text-center text-xs text-slate-muted hover:text-slate-text transition-colors"
-            >
-              Cancel
-            </button>
+              <button
+                onClick={() => setShowAuth(false)}
+                className="text-xs text-slate-muted hover:text-slate-text transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -19,36 +19,40 @@ class RedisClient:
     async def get_trip_state(self, trip_id: str) -> dict:
         if not self.redis:
             return {}
-        data = await self.redis.get(f"trip_state:{trip_id}")
-        if data:
-            return json.loads(data)
+        try:
+            data = await self.redis.get(f"trip_state:{trip_id}")
+            if data:
+                return json.loads(data)
+        except Exception:
+            pass
         return {}
 
     async def set_trip_state(self, trip_id: str, state: dict, ttl: int = 86400):
         if not self.redis:
             return
-        await self.redis.set(
-            f"trip_state:{trip_id}",
-            json.dumps(state),
-            ex=ttl,
-        )
+        try:
+            await self.redis.set(f"trip_state:{trip_id}", json.dumps(state), ex=ttl)
+        except Exception:
+            pass
 
     async def get_messages(self, trip_id: str) -> list:
         if not self.redis:
             return []
-        data = await self.redis.get(f"messages:{trip_id}")
-        if data:
-            return json.loads(data)
+        try:
+            data = await self.redis.get(f"messages:{trip_id}")
+            if data:
+                return json.loads(data)
+        except Exception:
+            pass
         return []
 
     async def set_messages(self, trip_id: str, messages: list, ttl: int = 86400):
         if not self.redis:
             return
-        await self.redis.set(
-            f"messages:{trip_id}",
-            json.dumps(messages),
-            ex=ttl,
-        )
+        try:
+            await self.redis.set(f"messages:{trip_id}", json.dumps(messages), ex=ttl)
+        except Exception:
+            pass
 
     async def ping(self) -> bool:
         if not self.redis:

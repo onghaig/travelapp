@@ -12,7 +12,7 @@ from pydantic import BaseModel
 load_dotenv()
 
 from backend.redis_client import redis_client
-from backend.db.supabase import get_supabase
+from backend.db.supabase import get_supabase, get_supabase_anon
 from backend.agents.orchestrator import OrchestratorAgent
 
 
@@ -59,6 +59,11 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
 # ── Request/Response models ───────────────────────────────────────────────────
 
 class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class SignupRequest(BaseModel):
     email: str
     password: str
 
@@ -117,7 +122,7 @@ async def health():
 @app.post("/api/auth/login")
 async def login(request: LoginRequest):
     try:
-        supabase = get_supabase()
+        supabase = get_supabase_anon()
         response = supabase.auth.sign_in_with_password(
             {"email": request.email, "password": request.password}
         )
@@ -127,6 +132,24 @@ async def login(request: LoginRequest):
         }
     except Exception as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
+
+
+@app.post("/api/auth/signup")
+async def signup(request: SignupRequest):
+    try:
+        supabase = get_supabase_anon()
+        response = supabase.auth.sign_up(
+            {"email": request.email, "password": request.password}
+        )
+        if not response.session:
+            # Email confirmation required — no session yet
+            return {"message": "Check your email to confirm your account."}
+        return {
+            "access_token": response.session.access_token,
+            "user": {"id": response.user.id, "email": response.user.email},
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/api/auth/logout")
@@ -243,6 +266,37 @@ async def update_trip(
 async def chat(request: ChatRequest, user=Depends(get_current_user)):
     trip_state = await redis_client.get_trip_state(request.trip_id)
     history = await redis_client.get_messages(request.trip_id)
+
+    # Fall back to Supabase when Redis has no history
+    if not history:
+        try:
+            supabase = get_supabase()
+            msg_resp = (
+                supabase.table("messages")
+                .select("role,content")
+                .eq("trip_id", request.trip_id)
+                .order("created_at")
+                .execute()
+            )
+            history = [{"role": m["role"], "content": m["content"]} for m in msg_resp.data]
+        except Exception:
+            history = []
+
+    # Fall back to Supabase for trip state too
+    if not trip_state:
+        try:
+            supabase = get_supabase()
+            trip_resp = (
+                supabase.table("trips")
+                .select("state_json")
+                .eq("id", request.trip_id)
+                .single()
+                .execute()
+            )
+            trip_state = trip_resp.data.get("state_json") or {}
+        except Exception:
+            trip_state = {}
+
     orchestrator = OrchestratorAgent(trip_state, user)
 
     async def event_stream():
