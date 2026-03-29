@@ -20,16 +20,21 @@ export interface Trip {
 
 export interface TripState {
   destination?: string;
+  origin?: string;
   departure_date?: string;
   return_date?: string;
   num_travelers?: number;
   budget_total?: number;
+  lodging_type?: 'airbnb' | 'hotel' | 'both';
+  preferred_airlines?: string[];
+  preferred_times?: 'morning' | 'afternoon' | 'evening' | 'any';
+  interests?: string[];
   flights?: Flight[];
   selected_flight?: Flight;
   lodging?: Lodging[];
   selected_lodging?: Lodging;
-  events?: Event[];
-  selected_events?: Event[];
+  events?: TripEvent[];
+  selected_events?: TripEvent[];
   budget?: BudgetBreakdown;
   calendar_events?: CalendarEvent[];
   verification?: VerificationResult;

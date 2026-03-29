@@ -15,7 +15,14 @@ from backend.agents.booking_agent import BookingAgent
 from backend.tools.tool_definitions import TOOLS
 
 
+class _TripInfoHandler:
+    """Echoes params back so update_trip_state can merge them into trip_state."""
+    async def run(self, params: dict) -> dict:
+        return params
+
+
 STATUS_MESSAGES = {
+    "update_trip_info": "Saving trip details...",
     "search_flights": "Searching for flights...",
     "search_lodging": "Finding the best places to stay...",
     "find_events": "Discovering activities and experiences...",
@@ -28,25 +35,45 @@ STATUS_MESSAGES = {
 
 class OrchestratorAgent:
     SYSTEM_PROMPT = """
-    You are Travvy, an expert AI travel planner. Your job is to help users plan
-    complete trips from scratch — collecting their preferences, searching for the
-    best options, building a full itinerary, and guiding them through booking.
+    You are Travvy, a warm and efficient AI travel planner. You help users plan
+    complete trips through natural conversation — collecting preferences, finding
+    the best options, building an itinerary, and guiding them to booking.
 
-    You have access to tools to search for flights, lodging, and events, manage
-    their budget, sync their calendar, and initiate bookings.
+    Tools available: update_trip_info, search_flights, search_lodging, find_events,
+    check_budget, sync_calendar, verify_plan, initiate_booking.
 
-    Personality: warm, efficient, knowledgeable. Like a personal travel agent who
-    genuinely cares about getting every detail right.
+    ## STEP 1 — Collect info (one or two questions at a time)
+    As the user shares details, call update_trip_info IMMEDIATELY with each new piece.
+    Never re-ask for anything already in trip_state. Collect:
+      destination, origin (their departure city), departure_date, return_date,
+      num_travelers, budget_total, lodging_type, preferred_times, interests.
 
-    Always:
-    - Collect all necessary info before searching (destination, dates, travelers, budget)
-    - Run flight, lodging, and event searches in parallel
-    - Check budget after every search
-    - Present options clearly with prices and key details
-    - Confirm the full plan before initiating any booking
-    - Never re-ask for information the user has already provided
+    When calling search_flights, use trip_state.num_travelers as num_passengers.
 
-    Trip state you are maintaining: {trip_state}
+    ## STEP 2 — Trigger searches automatically
+    Once trip_state contains destination + departure_date + num_travelers + budget_total,
+    IMMEDIATELY call search_flights, search_lodging, and find_events in PARALLEL.
+    Do NOT ask the user for permission. Do NOT wait for more info.
+    After searches return, call check_budget with the combined costs.
+    After budget check, call sync_calendar with the flight + lodging events.
+
+    ## STEP 3 — Present results conversationally
+    Summarize the top flight (cheapest + best value), top lodging option, and
+    3–4 activities in a friendly message. Tell the user to select options on the
+    Dashboard. Check in: "Does this look right, or shall I adjust anything?"
+
+    ## STEP 4 — Verify and confirm
+    When the user is happy, call verify_plan. If verified, tell the user to go to
+    the Confirmation screen to start booking.
+
+    ## RULES
+    - NEVER re-ask for information already in trip_state
+    - If trip_state already has destination/dates/travelers/budget, skip to STEP 2
+    - After every user selection, call check_budget
+    - If over_budget, proactively suggest cheaper options
+    - For change requests: re-run only the affected agents, present the diff
+
+    Current trip state: {trip_state}
     """
 
     def __init__(self, trip_state: dict, user: dict):
@@ -56,6 +83,7 @@ class OrchestratorAgent:
         self.trip_state = trip_state
         self.user = user
         self.sub_agents: dict = {
+            "update_trip_info": _TripInfoHandler(),
             "search_flights": FlightAgent(),
             "search_lodging": LodgingAgent(),
             "find_events": EventsAgent(),
@@ -86,6 +114,10 @@ class OrchestratorAgent:
             self.trip_state["calendar_events"] = result.get("events", [])
         elif tool_name == "verify_plan":
             self.trip_state["verification"] = result
+        elif tool_name == "update_trip_info":
+            for key, value in result.items():
+                if value is not None:
+                    self.trip_state[key] = value
 
     async def stream(
         self, user_message: str, history: list
@@ -120,7 +152,7 @@ class OrchestratorAgent:
 
             # Handle tool calls
             tool_calls = message.tool_calls or []
-            parallel_tools = ["search_flights", "search_lodging", "find_events"]
+            parallel_tools = ["update_trip_info", "search_flights", "search_lodging", "find_events"]
 
             parallel = [t for t in tool_calls if t.function.name in parallel_tools]
             sequential = [t for t in tool_calls if t.function.name not in parallel_tools]

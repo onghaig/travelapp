@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, AlertCircle, Plane, Building2, Calendar, User, ArrowRight, Loader2 } from 'lucide-react';
-import { getTrip, initiateBooking, updateBooking } from '../lib/api';
+import { CheckCircle, AlertCircle, Plane, Building2, Calendar, User, ArrowRight } from 'lucide-react';
+import { getTrip, updateBooking } from '../lib/api';
 import { Trip, TripState, Booking } from '../lib/types';
 import { format, parseISO } from 'date-fns';
 import FloatingChat from '../components/FloatingChat';
@@ -57,63 +57,63 @@ export default function Confirmation() {
     ...(tripState.selected_events || []).map((e) => ({ type: 'event', item: e, label: e.name })),
   ];
 
-  const startBookingFlow = async () => {
+  const buildBookingUrl = (bookingType: string, item: Record<string, unknown>): string => {
+    const params = (item.booking_url_params ?? {}) as Record<string, unknown>;
+    if (bookingType === 'flight') {
+      const origin = params.origin ?? '';
+      const dest = params.destination ?? '';
+      const date = params.date ?? '';
+      const adults = params.adults ?? travelerInfo.first_name ? 1 : (tripState.num_travelers ?? 1);
+      return `https://www.google.com/travel/flights?q=flights+from+${origin}+to+${dest}+on+${date}&adults=${adults}`;
+    }
+    if (bookingType === 'hotel') {
+      const dest = encodeURIComponent(String(params.destination ?? ''));
+      return `https://www.booking.com/searchresults.html?ss=${dest}&checkin=${params.check_in ?? ''}&checkout=${params.check_out ?? ''}&group_adults=${params.guests ?? 1}`;
+    }
+    if (bookingType === 'airbnb') {
+      const dest = encodeURIComponent(String(params.destination ?? ''));
+      return `https://www.airbnb.com/s/${dest}/homes?checkin=${params.check_in ?? ''}&checkout=${params.check_out ?? ''}&adults=${params.guests ?? 1}`;
+    }
+    if (bookingType === 'event') {
+      const query = encodeURIComponent(`${String(item.name ?? '')} ${String(params.destination ?? '')}`);
+      return `https://www.viator.com/search/${query}`;
+    }
+    return 'https://www.google.com/travel';
+  };
+
+  const startBookingFlow = () => {
     setBookingFlow('active');
     setCurrentBookingIdx(0);
     setBookingStates(bookingItems.map((item) => ({ type: item.type, step: 'idle' })));
-    await processBooking(0);
+    processBooking(0);
   };
 
-  const processBooking = async (idx: number) => {
+  const processBooking = (idx: number) => {
     if (idx >= bookingItems.length) {
       setBookingFlow('complete');
       return;
     }
-
     const bookingItem = bookingItems[idx];
-    setBookingStates((prev) =>
-      prev.map((s, i) => (i === idx ? { ...s, step: 'loading' } : s))
-    );
     setCurrentBookingIdx(idx);
-
-    try {
-      const result = await initiateBooking(
-        tripId!,
-        bookingItem.type,
-        (bookingItem.item as { id: string }).id,
-        { ...travelerInfo, booking_url_params: (bookingItem.item as { booking_url_params: Record<string, unknown> }).booking_url_params }
-      );
-
-      const step: BookingStep = result.result.status === 'at_checkout' ? 'at_checkout' : 'deep_link';
-      setBookingStates((prev) =>
-        prev.map((s, i) =>
-          i === idx ? { ...s, step, result: result.result, bookingId: result.booking.id } : s
-        )
-      );
-    } catch {
-      setBookingStates((prev) =>
-        prev.map((s, i) =>
-          i === idx ? { ...s, step: 'deep_link', result: { url: '#' } } : s
-        )
-      );
-    }
+    const url = buildBookingUrl(bookingItem.type, bookingItem.item as Record<string, unknown>);
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setBookingStates((prev) =>
+      prev.map((s, i) => (i === idx ? { ...s, step: 'deep_link', result: { url } } : s))
+    );
   };
 
-  const confirmBooking = async (idx: number) => {
-    const bs = bookingStates[idx];
-    if (bs.bookingId) {
-      try {
-        await updateBooking(bs.bookingId, { status: 'confirmed' });
-      } catch {
-        // non-fatal
-      }
-    }
+  const confirmBooking = (idx: number) => {
     setBookingStates((prev) =>
       prev.map((s, i) => (i === idx ? { ...s, step: 'confirmed' } : s))
     );
+    // best-effort backend record
+    const bs = bookingStates[idx];
+    if (bs.bookingId) {
+      updateBooking(bs.bookingId, { status: 'confirmed' }).catch(() => {});
+    }
     const nextIdx = idx + 1;
     if (nextIdx < bookingItems.length) {
-      await processBooking(nextIdx);
+      processBooking(nextIdx);
     } else {
       setBookingFlow('complete');
     }
@@ -271,60 +271,54 @@ export default function Confirmation() {
 
         {bookingFlow === 'active' && bookingStates[currentBookingIdx] && (
           <div className="bg-navy-card border border-amber/30 rounded-xl p-5">
-            <h3 className="font-semibold text-slate-text mb-3">
-              Booking {currentBookingIdx + 1} of {bookingItems.length}: {bookingItems[currentBookingIdx].label}
-            </h3>
-
-            {bookingStates[currentBookingIdx].step === 'loading' && (
-              <div className="flex items-center gap-3 text-slate-muted">
-                <Loader2 size={18} className="animate-spin text-amber" />
-                <span className="text-sm">Opening booking page...</span>
-              </div>
-            )}
-
-            {bookingStates[currentBookingIdx].step === 'at_checkout' && (
-              <div>
-                <p className="text-sm text-slate-text mb-3">
-                  We've filled in your details. Review and complete the payment below.
-                </p>
-                {bookingStates[currentBookingIdx].result?.checkout_url && (
-                  <div className="mb-3 p-3 rounded-lg bg-white/5 border border-white/10">
-                    <p className="text-xs text-slate-muted">Checkout URL:</p>
-                    <p className="text-xs text-amber break-all">
-                      {String(bookingStates[currentBookingIdx].result?.checkout_url)}
-                    </p>
+            {/* Step indicator */}
+            <div className="flex items-center gap-2 mb-4">
+              {bookingItems.map((item, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                    bookingStates[i]?.step === 'confirmed'
+                      ? 'bg-green-500 text-white'
+                      : i === currentBookingIdx
+                      ? 'bg-amber text-navy'
+                      : 'bg-white/10 text-slate-muted'
+                  }`}>
+                    {bookingStates[i]?.step === 'confirmed' ? '✓' : i + 1}
                   </div>
-                )}
-                <button
-                  onClick={() => confirmBooking(currentBookingIdx)}
-                  className="w-full py-3 rounded-xl bg-green-500 text-white font-medium hover:bg-green-400 transition-colors text-sm"
-                >
-                  I've completed this booking →
-                </button>
-              </div>
-            )}
+                  <span className={`text-xs ${i === currentBookingIdx ? 'text-slate-text' : 'text-slate-muted'}`}>
+                    {item.type}
+                  </span>
+                  {i < bookingItems.length - 1 && <div className="w-4 h-px bg-slate-border" />}
+                </div>
+              ))}
+            </div>
 
-            {bookingStates[currentBookingIdx].step === 'deep_link' && (
-              <div>
-                <p className="text-sm text-slate-text mb-3">
-                  Complete your booking on the provider's site, then come back and confirm.
-                </p>
-                <a
-                  href={String(bookingStates[currentBookingIdx].result?.url || '#')}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block w-full py-2.5 rounded-xl bg-white/10 text-slate-text text-center text-sm font-medium hover:bg-white/15 transition-colors mb-3"
-                >
-                  Open Booking Page →
-                </a>
-                <button
-                  onClick={() => confirmBooking(currentBookingIdx)}
-                  className="w-full py-3 rounded-xl bg-green-500 text-white font-medium hover:bg-green-400 transition-colors text-sm"
-                >
-                  I've completed this booking →
-                </button>
-              </div>
-            )}
+            <h3 className="font-semibold text-slate-text mb-1">
+              {bookingItems[currentBookingIdx].label}
+            </h3>
+            <p className="text-sm text-slate-muted mb-4">
+              A pre-filled booking page has been opened in a new tab. Complete your payment there, then come back here to confirm.
+            </p>
+
+            <a
+              href={String(bookingStates[currentBookingIdx].result?.url || '#')}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full py-2.5 rounded-xl bg-white/10 text-slate-text text-center text-sm font-medium hover:bg-white/15 transition-colors mb-3"
+            >
+              Re-open Booking Page →
+            </a>
+            <button
+              onClick={() => confirmBooking(currentBookingIdx)}
+              className="w-full py-3 rounded-xl bg-green-500 text-white font-medium hover:bg-green-400 transition-colors text-sm"
+            >
+              I've completed this booking ✓
+            </button>
+            <button
+              onClick={() => confirmBooking(currentBookingIdx)}
+              className="mt-2 w-full text-xs text-slate-muted hover:text-slate-text transition-colors text-center"
+            >
+              Skip for now
+            </button>
           </div>
         )}
 

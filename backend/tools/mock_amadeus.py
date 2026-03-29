@@ -18,6 +18,40 @@ AIRLINES = [
     {"code": "KL", "name": "KLM Royal Dutch Airlines"},
 ]
 
+CITY_TO_IATA = {
+    "new york": "JFK", "nyc": "JFK", "new york city": "JFK",
+    "los angeles": "LAX", "la": "LAX",
+    "chicago": "ORD",
+    "san francisco": "SFO", "sf": "SFO",
+    "miami": "MIA",
+    "boston": "BOS",
+    "seattle": "SEA",
+    "london": "LHR",
+    "paris": "CDG",
+    "tokyo": "NRT",
+    "osaka": "KIX",
+    "rome": "FCO",
+    "barcelona": "BCN",
+    "madrid": "MAD",
+    "amsterdam": "AMS",
+    "dubai": "DXB",
+    "singapore": "SIN",
+    "sydney": "SYD",
+    "toronto": "YYZ",
+    "bangkok": "BKK",
+    "bali": "DPS", "denpasar": "DPS",
+    "hong kong": "HKG",
+    "seoul": "ICN",
+    "lisbon": "LIS",
+    "berlin": "BER",
+    "athens": "ATH",
+    "cancun": "CUN",
+    "mexico city": "MEX",
+    "cairo": "CAI",
+    "mumbai": "BOM",
+    "delhi": "DEL",
+}
+
 PEAK_MONTHS = [6, 7, 8, 12]  # June, July, August, December
 
 CITY_AIRPORTS = {
@@ -267,6 +301,30 @@ HOTELS = {
             "image_hint": "soho new york loft apartment",
         },
     ],
+    "bangkok": [
+        {"id": "hotel_bkk_1", "name": "Mandarin Oriental Bangkok", "neighborhood": "Riverside", "type": "hotel", "rating": 4.9, "stars": 5, "base_price": 420, "amenities": ["spa", "pool", "multiple restaurants", "river view"]},
+        {"id": "hotel_bkk_2", "name": "Park Hyatt Bangkok", "neighborhood": "Ploenchit", "type": "hotel", "rating": 4.8, "stars": 5, "base_price": 320, "amenities": ["rooftop pool", "spa", "gym", "restaurant"]},
+        {"id": "hotel_bkk_3", "name": "Sukhumvit Airbnb Condo", "neighborhood": "Sukhumvit", "type": "airbnb", "rating": 4.7, "stars": None, "base_price": 65, "amenities": ["pool", "gym", "wifi", "kitchen"]},
+        {"id": "hotel_bkk_4", "name": "Silom Design Hotel", "neighborhood": "Silom", "type": "hotel", "rating": 4.4, "stars": 4, "base_price": 120, "amenities": ["rooftop bar", "pool", "gym"]},
+    ],
+    "bali": [
+        {"id": "hotel_bali_1", "name": "Four Seasons Resort Bali at Sayan", "neighborhood": "Ubud", "type": "hotel", "rating": 4.9, "stars": 5, "base_price": 680, "amenities": ["infinity pool", "spa", "jungle view", "restaurant"]},
+        {"id": "hotel_bali_2", "name": "COMO Uma Canggu", "neighborhood": "Canggu", "type": "hotel", "rating": 4.7, "stars": 5, "base_price": 380, "amenities": ["surf beach", "pool", "spa", "yoga"]},
+        {"id": "hotel_bali_3", "name": "Canggu Villa with Pool", "neighborhood": "Canggu", "type": "airbnb", "rating": 4.85, "stars": None, "base_price": 120, "amenities": ["private pool", "kitchen", "scooter rental", "wifi"]},
+        {"id": "hotel_bali_4", "name": "Seminyak Beachfront Villa", "neighborhood": "Seminyak", "type": "airbnb", "rating": 4.9, "stars": None, "base_price": 210, "amenities": ["beach access", "private pool", "chef available", "wifi"]},
+    ],
+    "rome": [
+        {"id": "hotel_rome_1", "name": "Hotel de Russie", "neighborhood": "Piazza del Popolo", "type": "hotel", "rating": 4.8, "stars": 5, "base_price": 580, "amenities": ["spa", "pool", "garden", "concierge"]},
+        {"id": "hotel_rome_2", "name": "Il Palazzetto", "neighborhood": "Spanish Steps", "type": "hotel", "rating": 4.6, "stars": 4, "base_price": 320, "amenities": ["rooftop bar", "wine bar", "city view"]},
+        {"id": "hotel_rome_3", "name": "Trastevere Apartment", "neighborhood": "Trastevere", "type": "airbnb", "rating": 4.85, "stars": None, "base_price": 95, "amenities": ["kitchen", "wifi", "historic building", "near restaurants"]},
+        {"id": "hotel_rome_4", "name": "Monti Designer Flat", "neighborhood": "Monti", "type": "airbnb", "rating": 4.8, "stars": None, "base_price": 110, "amenities": ["kitchen", "wifi", "rooftop terrace", "near Colosseum"]},
+    ],
+    "barcelona": [
+        {"id": "hotel_bcn_1", "name": "Hotel Arts Barcelona", "neighborhood": "Barceloneta", "type": "hotel", "rating": 4.8, "stars": 5, "base_price": 450, "amenities": ["beach", "pool", "spa", "michelin restaurant"]},
+        {"id": "hotel_bcn_2", "name": "Mandarin Oriental Barcelona", "neighborhood": "Passeig de Gràcia", "type": "hotel", "rating": 4.7, "stars": 5, "base_price": 390, "amenities": ["spa", "pool", "bar", "concierge"]},
+        {"id": "hotel_bcn_3", "name": "Gràcia Neighbourhood Flat", "neighborhood": "Gràcia", "type": "airbnb", "rating": 4.8, "stars": None, "base_price": 90, "amenities": ["kitchen", "wifi", "balcony", "near Sagrada Familia"]},
+        {"id": "hotel_bcn_4", "name": "Born District Loft", "neighborhood": "El Born", "type": "airbnb", "rating": 4.75, "stars": None, "base_price": 105, "amenities": ["kitchen", "wifi", "terrace", "near Picasso Museum"]},
+    ],
 }
 
 EVENTS_DATA = {
@@ -478,6 +536,34 @@ EVENTS_DATA = {
             "category": "outdoor",
         },
     ],
+    "bangkok": [
+        {"id": "evt_bkk_1", "name": "Grand Palace & Wat Phra Kaew Tour", "type": "culture", "duration_hours": 3, "price_per_person": 45, "rating": 4.8, "description": "Guided tour of Bangkok's most sacred temple complex", "category": "arts & culture"},
+        {"id": "evt_bkk_2", "name": "Bangkok Street Food Night Tour", "type": "food", "duration_hours": 3, "price_per_person": 55, "rating": 4.9, "description": "Guided tuk-tuk tour through Bangkok's best street food stalls", "category": "food & drink"},
+        {"id": "evt_bkk_3", "name": "Floating Market Day Trip", "type": "outdoor", "duration_hours": 6, "price_per_person": 75, "rating": 4.6, "description": "Visit the famous Damnoen Saduak Floating Market", "category": "day trips"},
+        {"id": "evt_bkk_4", "name": "Thai Cooking Class", "type": "food", "duration_hours": 4, "price_per_person": 65, "rating": 4.9, "description": "Learn to make 4 authentic Thai dishes with a local chef", "category": "food & drink"},
+        {"id": "evt_bkk_5", "name": "Rooftop Bar Hopping Tour", "type": "nightlife", "duration_hours": 4, "price_per_person": 85, "rating": 4.7, "description": "Visit Bangkok's most spectacular rooftop bars", "category": "nightlife"},
+    ],
+    "bali": [
+        {"id": "evt_bali_1", "name": "Ubud Monkey Forest & Rice Terrace", "type": "outdoor", "duration_hours": 6, "price_per_person": 55, "rating": 4.8, "description": "Explore the Sacred Monkey Forest and Tegallalang Rice Terraces", "category": "outdoor"},
+        {"id": "evt_bali_2", "name": "Mount Batur Sunrise Trek", "type": "outdoor", "duration_hours": 8, "price_per_person": 70, "rating": 4.9, "description": "Hike an active volcano at sunrise with guide and breakfast", "category": "outdoor"},
+        {"id": "evt_bali_3", "name": "Balinese Cooking Class", "type": "food", "duration_hours": 4, "price_per_person": 55, "rating": 4.9, "description": "Morning market visit and hands-on Balinese cooking class", "category": "food & drink"},
+        {"id": "evt_bali_4", "name": "Uluwatu Temple Sunset & Kecak Dance", "type": "culture", "duration_hours": 3, "price_per_person": 35, "rating": 4.8, "description": "Watch the famous Kecak fire dance at clifftop Uluwatu Temple", "category": "arts & culture"},
+        {"id": "evt_bali_5", "name": "Surf Lesson in Seminyak", "type": "outdoor", "duration_hours": 2, "price_per_person": 45, "rating": 4.7, "description": "Professional surf lesson for all levels on Bali's best beach", "category": "outdoor"},
+    ],
+    "rome": [
+        {"id": "evt_rome_1", "name": "Colosseum & Roman Forum Skip-the-Line", "type": "culture", "duration_hours": 3, "price_per_person": 65, "rating": 4.9, "description": "Expert-guided tour of the ancient Colosseum and Roman Forum", "category": "arts & culture"},
+        {"id": "evt_rome_2", "name": "Vatican Museums & Sistine Chapel Tour", "type": "culture", "duration_hours": 3, "price_per_person": 70, "rating": 4.8, "description": "Skip-the-line access with expert art historian guide", "category": "arts & culture"},
+        {"id": "evt_rome_3", "name": "Roman Food & Wine Walking Tour", "type": "food", "duration_hours": 3, "price_per_person": 85, "rating": 4.9, "description": "Taste pasta, gelato, wine, and street food across Rome", "category": "food & drink"},
+        {"id": "evt_rome_4", "name": "Pasta Making Class in Trastevere", "type": "food", "duration_hours": 3, "price_per_person": 95, "rating": 4.9, "description": "Hands-on pasta and tiramisu class with a Roman chef", "category": "food & drink"},
+        {"id": "evt_rome_5", "name": "Day Trip to Pompeii", "type": "culture", "duration_hours": 10, "price_per_person": 99, "rating": 4.7, "description": "Guided day trip to the ancient ruins of Pompeii", "category": "day trips"},
+    ],
+    "barcelona": [
+        {"id": "evt_bcn_1", "name": "Sagrada Família Skip-the-Line Tour", "type": "culture", "duration_hours": 2, "price_per_person": 55, "rating": 4.9, "description": "Expert-guided tour of Gaudí's iconic unfinished basilica", "category": "arts & culture"},
+        {"id": "evt_bcn_2", "name": "Barcelona Tapas & Wine Tour", "type": "food", "duration_hours": 3, "price_per_person": 85, "rating": 4.9, "description": "Guided evening tapas crawl through El Born and Gothic Quarter", "category": "food & drink"},
+        {"id": "evt_bcn_3", "name": "Park Güell & Gaudí Walking Tour", "type": "culture", "duration_hours": 3, "price_per_person": 45, "rating": 4.7, "description": "Explore Gaudí's magical public park with skip-the-line access", "category": "arts & culture"},
+        {"id": "evt_bcn_4", "name": "Cooking Class: Paella & Sangria", "type": "food", "duration_hours": 3, "price_per_person": 90, "rating": 4.9, "description": "Learn authentic Catalan recipes in a Barcelona kitchen", "category": "food & drink"},
+        {"id": "evt_bcn_5", "name": "Barcelona FC Camp Nou Stadium Tour", "type": "entertainment", "duration_hours": 2, "price_per_person": 35, "rating": 4.7, "description": "Behind-the-scenes tour of one of the world's greatest stadiums", "category": "entertainment"},
+    ],
 }
 
 
@@ -491,17 +577,44 @@ def _get_price_multiplier(departure_date: str) -> float:
         return 1.0
 
 
+def _normalize_city(name: str) -> str:
+    """Strip non-ASCII characters (emojis, flags) and lowercase."""
+    return ''.join(c for c in name if ord(c) < 128).strip().lower()
+
+
 def _get_destination_key(destination: str) -> str:
-    dest_lower = destination.lower()
+    dest = _normalize_city(destination)
     for key in HOTELS.keys():
-        if key in dest_lower or dest_lower in key:
+        if key in dest or dest in key:
             return key
+    # Try partial word match
+    for key in HOTELS.keys():
+        for word in dest.split():
+            if word in key or key in word:
+                return key
     return "new york"
 
 
+def _normalize_to_iata(city: str) -> str:
+    """Convert a city name to its primary IATA airport code."""
+    city_clean = _normalize_city(city)
+    if city_clean in CITY_TO_IATA:
+        return CITY_TO_IATA[city_clean]
+    for key, code in CITY_TO_IATA.items():
+        if key in city_clean or city_clean in key:
+            return code
+    # Assume it's already an IATA code if 2-4 uppercase letters
+    stripped = city.strip()
+    if len(stripped) <= 4 and stripped.isalpha():
+        return stripped.upper()
+    # Fallback: first 3 alpha chars
+    alpha = ''.join(c for c in city_clean if c.isalpha())
+    return alpha[:3].upper() if alpha else "JFK"
+
+
 async def search_flights(params: dict) -> dict:
-    origin = params.get("origin", "JFK")
-    destination = params.get("destination", "NRT")
+    origin = _normalize_to_iata(params.get("origin", "JFK"))
+    destination = _normalize_to_iata(params.get("destination", "NRT"))
     departure_date = params.get("departure_date", "2025-07-01")
     return_date = params.get("return_date")
     num_passengers = params.get("num_passengers", 1)
@@ -520,6 +633,15 @@ async def search_flights(params: dict) -> dict:
         "LAX-CDG": 680, "CDG-LAX": 680,
         "ORD-CDG": 550, "CDG-ORD": 550,
         "SFO-NRT": 700, "NRT-SFO": 700,
+        "JFK-FCO": 560, "FCO-JFK": 560,
+        "JFK-BCN": 540, "BCN-JFK": 540,
+        "JFK-BKK": 850, "BKK-JFK": 850,
+        "JFK-DPS": 920, "DPS-JFK": 920,
+        "LAX-DPS": 780, "DPS-LAX": 780,
+        "LAX-BKK": 720, "BKK-LAX": 720,
+        "LHR-NRT": 680, "NRT-LHR": 680,
+        "LHR-DPS": 760, "DPS-LHR": 760,
+        "LHR-BKK": 480, "BKK-LHR": 480,
     }
     base_price = base_prices.get(route_key, 450)
 
@@ -537,6 +659,13 @@ async def search_flights(params: dict) -> dict:
         "JFK-CDG": "7h 30m", "CDG-JFK": "8h 15m",
         "JFK-LHR": "7h 00m", "LHR-JFK": "7h 45m",
         "LAX-NRT": "11h 30m", "NRT-LAX": "10h 45m",
+        "JFK-FCO": "9h 30m", "FCO-JFK": "10h 15m",
+        "JFK-BCN": "8h 30m", "BCN-JFK": "9h 15m",
+        "JFK-BKK": "18h 00m", "BKK-JFK": "17h 30m",
+        "JFK-DPS": "20h 00m", "DPS-JFK": "19h 00m",
+        "LAX-DPS": "16h 00m", "DPS-LAX": "15h 00m",
+        "LAX-BKK": "16h 30m", "BKK-LAX": "15h 30m",
+        "LHR-NRT": "11h 45m", "NRT-LHR": "13h 00m",
     }
     duration = durations.get(route_key, "9h 00m")
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Download } from 'lucide-react';
 import {
   format,
   startOfMonth,
@@ -18,9 +18,41 @@ interface CalendarProps {
   onEventClick?: (event: CalendarEvent) => void;
 }
 
+function toICS(events: CalendarEvent[]): string {
+  const fmt = (iso: string) => iso.replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Travvy//Travel Planner//EN',
+  ];
+  for (const e of events) {
+    lines.push(
+      'BEGIN:VEVENT',
+      `UID:${e.id}@travvy`,
+      `SUMMARY:${e.title}`,
+      `DTSTART:${fmt(e.start_time)}`,
+      `DTEND:${fmt(e.end_time)}`,
+      e.location ? `LOCATION:${e.location}` : '',
+      'END:VEVENT',
+    );
+  }
+  lines.push('END:VCALENDAR');
+  return lines.filter(Boolean).join('\r\n');
+}
+
 export default function Calendar({ events, onEventClick }: CalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+
+  const exportICS = () => {
+    const blob = new Blob([toICS(events)], { type: 'text/calendar' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'travvy-trip.ics';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -120,20 +152,32 @@ export default function Calendar({ events, onEventClick }: CalendarProps) {
         })}
       </div>
 
-      {/* Legend */}
-      <div className="flex items-center gap-4 p-3 border-t border-slate-border">
-        <div className="flex items-center gap-1.5 text-xs text-slate-muted">
-          <div className="w-3 h-3 rounded-sm bg-blue-500/60" />
-          Flights
+      {/* Legend + export */}
+      <div className="flex items-center justify-between p-3 border-t border-slate-border">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5 text-xs text-slate-muted">
+            <div className="w-3 h-3 rounded-sm bg-blue-500/60" />
+            Flights
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-slate-muted">
+            <div className="w-3 h-3 rounded-sm bg-green-500/60" />
+            Lodging
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-slate-muted">
+            <div className="w-3 h-3 rounded-sm bg-purple-500/60" />
+            Activities
+          </div>
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-slate-muted">
-          <div className="w-3 h-3 rounded-sm bg-green-500/60" />
-          Lodging
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-slate-muted">
-          <div className="w-3 h-3 rounded-sm bg-purple-500/60" />
-          Activities
-        </div>
+        {events.length > 0 && (
+          <button
+            onClick={exportICS}
+            className="flex items-center gap-1 text-xs text-slate-muted hover:text-amber transition-colors"
+            title="Export to Google Calendar / Apple Calendar"
+          >
+            <Download size={12} />
+            Export .ics
+          </button>
+        )}
       </div>
 
       {/* Event detail panel */}

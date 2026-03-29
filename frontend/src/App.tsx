@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import Chat from './pages/Chat';
+import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Confirmation from './pages/Confirmation';
 import MyTrip from './pages/MyTrip';
@@ -27,7 +28,11 @@ function App() {
       <Routes>
         <Route
           path="/"
-          element={<Chat onAuthChange={setIsAuthenticated} />}
+          element={isAuthenticated ? <Chat onAuthChange={setIsAuthenticated} isAuthenticated={isAuthenticated} /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/login"
+          element={isAuthenticated ? <Navigate to="/" /> : <Login onAuthChange={setIsAuthenticated} />}
         />
         <Route
           path="/dashboard/:tripId"

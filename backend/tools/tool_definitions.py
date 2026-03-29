@@ -137,6 +137,34 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "update_trip_info",
+            "description": (
+                "Persist trip planning information collected from the user into the trip state. "
+                "Call this IMMEDIATELY whenever you learn destination, origin, dates, travelers, "
+                "budget, or preferences — do NOT wait to collect everything first. "
+                "Omit fields you don't yet know."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "destination": {"type": "string", "description": "City name or region (e.g. 'Tokyo')"},
+                    "origin": {"type": "string", "description": "Departure city or IATA code (e.g. 'New York', 'JFK')"},
+                    "departure_date": {"type": "string", "description": "YYYY-MM-DD"},
+                    "return_date": {"type": "string", "description": "YYYY-MM-DD"},
+                    "num_travelers": {"type": "integer"},
+                    "budget_total": {"type": "number", "description": "Total trip budget in USD"},
+                    "lodging_type": {"type": "string", "enum": ["airbnb", "hotel", "both"]},
+                    "preferred_airlines": {"type": "array", "items": {"type": "string"}},
+                    "preferred_times": {"type": "string", "enum": ["morning", "afternoon", "evening", "any"]},
+                    "interests": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "initiate_booking",
             "description": "Begin the automated booking process for a specific item using Playwright.",
             "parameters": {
